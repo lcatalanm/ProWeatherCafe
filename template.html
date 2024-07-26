@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Forecast</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .text-shadow-sm {
+            text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        .text-shadow-md {
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body class="relative w-[1080px] h-[1080px] overflow-hidden">
+    <img src="data:image/jpeg;base64,{{ background_image }}" alt="Background" class="absolute inset-0 w-full h-full object-cover">
+    
+    <!-- Overlay gradients -->
+    <div class="absolute inset-0 bg-gradient-to-br from-black via-transparent to-transparent opacity-70"></div>
+    <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-60"></div>
+    <div class="absolute inset-0 bg-gradient-to-r from-black via-transparent to-transparent opacity-50"></div>
+    
+    <!-- Contenedor principal -->
+    <div class="relative z-10 flex flex-col items-start justify-between h-full p-12 text-white">
+        <div>
+            <div class="mb-4 px-3 py-1 bg-white bg-opacity-20 backdrop-blur-sm rounded-full text-sm font-medium">
+                Weather Forecast
+            </div>
+            
+            <h1 class="text-6xl md:text-7xl font-bold mb-2 leading-tight text-shadow-md">
+                Mackay Botanic Gardens
+            </h1>
+            
+            <h2 class="text-2xl md:text-3xl font-semibold mb-8 text-gray-300">
+                {{ date }}
+            </h2>
+            
+            <div class="flex flex-wrap justify-start space-x-8 mb-10">
+                <div class="text-center mb-4">
+                    <p class="text-5xl md:text-6xl font-bold text-shadow-sm">{{ temp }}</p>
+                    <p class="text-lg md:text-xl mt-2 text-gray-300">Temperature</p>
+                </div>
+                <div class="text-center mb-4">
+                    <p class="text-5xl md:text-6xl font-bold text-shadow-sm">{{ humidity }}</p>
+                    <p class="text-lg md:text-xl mt-2 text-gray-300">Humidity</p>
+                </div>
+                <div class="text-center mb-4">
+                    <p class="text-5xl md:text-6xl font-bold text-shadow-sm">{{ condition }}</p>
+                    <p class="text-lg md:text-xl mt-2 text-gray-300">Condition</p>
+                </div>
+            </div>
+        </div>
+        
+        <div>
+            <p class="text-2xl md:text-3xl font-medium mb-8 max-w-2xl">
+                {{ beverage_recommendation }}
+            </p>
+            
+            <div class="flex items-center space-x-4">
+                <img src="data:image/png;base64,{{ logo_image }}" alt="Logo" class="w-20 md:w-24">
+                <p class="text-sm text-gray-400">Powered by OpenWeather</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
