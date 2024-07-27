@@ -111,5 +111,9 @@ if __name__ == "__main__":
     if output_file:
         print(f"Image generated: {output_file}")
         print(f"Beverage recommendation: {beverage_recommendation}")
+        
+        # Guardar la recomendación de bebida para post_to_facebook.py
+        with open("beverage_recommendation.txt", "w") as f:
+            f.write(beverage_recommendation)
     else:
         print("Café closed today, no image generated.")
