@@ -2,7 +2,7 @@ name: Generate and Post Weather Image
 
 on:
   schedule:
-    - cron: '10 2 * * *'  # Esto se ejecutará a las 2:10 am
+    - cron: '15 16 * * *'  # Esto se ejecutará a las 2:10 am
 
 jobs:
   generate-and-post:
