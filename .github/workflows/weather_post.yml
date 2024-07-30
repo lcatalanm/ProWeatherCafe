@@ -2,7 +2,7 @@ name: Generate and Post Weather Image
 
 on:
   schedule:
-    - cron: '59 16 * * *'  # Esto se ejecutará a las 22:00 UTC, que es las 8:00 AM AEST
+    - cron: '0 7 * * *'  # Esto se ejecutará a las 22:00 UTC, que es las 8:00 AM AEST
 
 jobs:
   generate-and-post:
