@@ -20,11 +20,11 @@ city = "West Mackay"
 
 def is_cafe_open():
     """
-    Determina si el café está abierto basado en el día de la semana.
-    Retorna False los lunes y martes, True para el resto de días.
+    Determina si el café está abierto.
+    Temporalmente retorna True para probar el script.
     """
-    today = date.today().weekday()
-    return today not in [0, 1]  # Cerrado lunes (0) y martes (1)
+    return True
+
 
 def select_background_image(temp_value):
     """
