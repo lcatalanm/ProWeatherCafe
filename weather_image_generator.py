@@ -153,6 +153,10 @@ def generate_weather_image():
     output_file = f"{date.today()}_Mackay_Story.png"
     hti.screenshot(html_file='rendered_template.html', save_as=output_file, size=(1080, 1080))
 
+    # Guardar recomendación de bebida en archivo
+    with open("beverage_recommendation.txt", "w") as f:
+        f.write(beverage_recommendation)
+
     return output_file, beverage_recommendation
 
 # ========================
@@ -162,7 +166,7 @@ def generate_weather_image():
 if __name__ == "__main__":
     output_file, beverage_recommendation = generate_weather_image()
     if output_file:
-        print(f"Imagen generada: {output_file}")
-        print(f"Recomendación de bebida: {beverage_recommendation}")
+        print(f"Generated image: {output_file}")
+        print(f"Beverage recommendation: {beverage_recommendation}")
     else:
-        print("Café cerrado hoy, no se generó imagen.")
+        print("Cafe is closed today. No image generated.")

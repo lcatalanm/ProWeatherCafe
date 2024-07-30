@@ -48,8 +48,14 @@ if __name__ == "__main__":
     image_path = f"{today}_Mackay_Story.png"
     
     if os.path.exists(image_path):
-        with open("beverage_recommendation.txt", "r") as f:
-            beverage_recommendation = f.read().strip()
+        try:
+            with open("beverage_recommendation.txt", "r") as f:
+                beverage_recommendation = f.read().strip()
+        except FileNotFoundError:
+            beverage_recommendation = "Enjoy our special beverage of the day!"
+            with open("beverage_recommendation.txt", "w") as f:
+                f.write(beverage_recommendation)
+                
         post_to_facebook(image_path, beverage_recommendation)
     else:
         print("No image generated for today. Skipping Facebook post.")
