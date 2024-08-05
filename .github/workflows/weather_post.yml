@@ -25,10 +25,11 @@ jobs:
       env:
         OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
       run: |
+        set -e
         python weather_image_generator.py
         if [ -f "$(date +%Y-%m-%d)_Mackay_Story.png" ]; then
           echo "Image generated successfully."
-        else:
+        else
           echo "No image generated. Exiting workflow."
           exit 0
 
