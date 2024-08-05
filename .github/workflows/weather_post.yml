@@ -8,7 +8,8 @@ jobs:
   generate-and-post:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - name: Checkout repository
+      uses: actions/checkout@v2
 
     - name: Set up Python
       uses: actions/setup-python@v2
@@ -30,7 +31,6 @@ jobs:
         else
           echo "No image generated. Exiting workflow."
           exit 0
-        fi
 
     - name: Post to Facebook
       env:
@@ -39,6 +39,8 @@ jobs:
       run: python post_to_facebook.py
 
     - name: Commit and push if changed
+      env:
+        GITHUB_TOKEN: ${{ secrets.PAT_GITHUB_TOKEN }}  # Usa el secreto configurado con el token de acceso personal
       run: |
         git config --global user.name 'GitHub Action'
         git config --global user.email 'action@github.com'
