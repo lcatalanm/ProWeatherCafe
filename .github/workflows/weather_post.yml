@@ -28,7 +28,7 @@ jobs:
         python weather_image_generator.py
         if [ -f "$(date +%Y-%m-%d)_Mackay_Story.png" ]; then
           echo "Image generated successfully."
-        else
+        else:
           echo "No image generated. Exiting workflow."
           exit 0
 
@@ -40,7 +40,7 @@ jobs:
 
     - name: Commit and push if changed
       env:
-        GITHUB_TOKEN: ${{ secrets.PAT_GITHUB_TOKEN }}  # Usa el secreto configurado con el token de acceso personal
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Usa el token proporcionado automáticamente por GitHub
       run: |
         git config --global user.name 'GitHub Action'
         git config --global user.email 'action@github.com'
