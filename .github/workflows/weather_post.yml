@@ -32,6 +32,7 @@ jobs:
         else
           echo "No image generated. Exiting workflow."
           exit 0
+        fi  # <- Cierre del bloque if-else
 
     - name: Post to Facebook
       env:
