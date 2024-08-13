@@ -1,172 +1,84 @@
 import requests
 import json
 import base64
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from jinja2 import Template
 from html2image import Html2Image
-import os
-import random
 
-# ========================
-# CONFIGURACIÓN
-# ========================
+# Configuración
+api_key = "26b68d1690cad1a73037ef81ced8529b"  # Actualiza con tu API key
+horarios = ["09:00:00", "10:00:00", "11:00:00", "12:00:00", "13:00:00", "14:00:00"]
+city = "Mackay"
 
-api_key = os.environ.get("OPENWEATHER_API_KEY")
-city = "West Mackay"
+# Obtener datos del clima
+url = f"http://api.openweathermap.org/data/2.5/forecast?q={city}&appid={api_key}&units=metric"
+response = requests.get(url)
+data = json.loads(response.text)
 
-# ========================
-# FUNCIONES AUXILIARES
-# ========================
-
-def is_cafe_open():
-    """
-    Determina si el café está abierto.
-    Temporalmente retorna True para probar el script.
-    """
-    return True
-
-
-def select_background_image(temp_value):
-    """
-    Selecciona una imagen de fondo basada en la temperatura y el historial de uso.
-    
-    Args:
-    temp_value (float): Temperatura actual.
-
-    Returns:
-    str: Ruta de la imagen seleccionada.
-    """
-    image_folder = "background_images"
-    hot_images = ["egg_benedic.jpg", "chocolate_frappe.jpg", "Ice_coffe.jpg", "Sandwich in a sunny day.jpg"]
-    cold_images = ["High_tea.jpg", "Stickydate pudding.jpg", "Hotchocolate.jpg"]
-    neutral_images = ["Breakfast in a sunny day.jpg", "Club Sandwich.jpg", "Breakfast(eggs, bread).jpg", "Muffins.jpg", "Capuccino.jpg"]
-    used_images_file = "used_images.json"
-
-    # Cargar historial de imágenes usadas
-    try:
-        if os.path.exists(used_images_file):
-            with open(used_images_file, "r") as f:
-                content = f.read().strip()
-                used_images = json.loads(content) if content else {}
+# Procesar datos del clima
+forecasts = []
+tomorrow = date.today()
+for horario in horarios:
+    forecast_time = datetime.combine(tomorrow, datetime.strptime(horario, "%H:%M:%S").time())
+    forecast_found = False
+    for forecast in data['list']:
+        api_time = datetime.strptime(forecast['dt_txt'], "%Y-%m-%d %H:%M:%S")
+        if api_time.date() == tomorrow and abs(api_time - forecast_time) <= timedelta(hours=1):
+            forecast_found = True
+            forecasts.append({
+                'time': forecast_time.strftime("%I:%M %p").lower().lstrip('0'),
+                'temp': f"{forecast['main']['temp']:.1f}°C",
+                'humidity': f"{forecast['main']['humidity']}%"
+            })
+            print(f"Encontrado pronóstico para {horario}: {forecast['dt_txt']}")
+            break
+    if not forecast_found:
+        nearest_forecast = min(data['list'], key=lambda x: abs(datetime.strptime(x['dt_txt'], "%Y-%m-%d %H:%M:%S") - forecast_time))
+        nearest_time = datetime.strptime(nearest_forecast['dt_txt'], "%Y-%m-%d %H:%M:%S")
+        if nearest_time.date() == tomorrow:
+            forecasts.append({
+                'time': forecast_time.strftime("%I:%M %p").lower().lstrip('0'),
+                'temp': f"{nearest_forecast['main']['temp']:.1f}°C",
+                'humidity': f"{nearest_forecast['main']['humidity']}%"
+            })
+            print(f"Usando pronóstico más cercano para {horario}: {nearest_forecast['dt_txt']}")
         else:
-            used_images = {}
-    except json.JSONDecodeError:
-        print("Error decodificando JSON. Reiniciando used_images.")
-        used_images = {}
+            forecasts.append({
+                'time': forecast_time.strftime("%I:%M %p").lower().lstrip('0'),
+                'temp': 'N/A',
+                'humidity': 'N/A'
+            })
+            print(f"No se encontró pronóstico para {horario}")
 
-    current_week = date.today().isocalendar()[1]
+# Imprimir pronósticos procesados
+print("\nPronósticos procesados:")
+for forecast in forecasts:
+    print(forecast)
 
-    # Seleccionar conjunto de imágenes basado en la temperatura
-    if temp_value > 25:
-        available_images = [img for img in hot_images if used_images.get(img, 0) != current_week]
-    elif temp_value < 15:
-        available_images = [img for img in cold_images if used_images.get(img, 0) != current_week]
-    else:
-        available_images = [img for img in neutral_images if used_images.get(img, 0) != current_week]
-
-    # Si no hay imágenes disponibles, usar todas
-    if not available_images:
-        available_images = hot_images + cold_images + neutral_images
-
-    # Seleccionar y registrar imagen usada
-    selected_image = random.choice(available_images)
-    used_images[selected_image] = current_week
-
-    # Guardar historial actualizado
-    with open(used_images_file, "w") as f:
-        json.dump(used_images, f)
-
-    return os.path.join(image_folder, selected_image)
-
+# Convertir imágenes a base64
 def image_to_base64(image_path):
-    """
-    Convierte una imagen a su representación en base64.
-    
-    Args:
-    image_path (str): Ruta de la imagen.
-
-    Returns:
-    str: Representación en base64 de la imagen.
-    """
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode('utf-8')
 
-# ========================
-# FUNCIÓN PRINCIPAL
-# ========================
+background_image = image_to_base64("Mackay-Large.jpg")
+logo_image = image_to_base64("logobgc_vectorized.png")
 
-def generate_weather_image():
-    """
-    Genera una imagen con información del clima para el café.
+# Rellenar la plantilla HTML
+with open("template.html") as file:
+    template = Template(file.read())
 
-    Returns:
-    tuple: (nombre_archivo, recomendación_bebida) o (None, None) si el café está cerrado.
-    """
-    if not is_cafe_open():
-        return None, None
+rendered_html = template.render(
+    date=(tomorrow).strftime("%A, %B %d, %Y"),
+    forecasts=forecasts,
+    background_image=background_image,
+    logo_image=logo_image
+)
 
-    # Obtener datos del clima
-    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
-    response = requests.get(url)
-    data = json.loads(response.text)
+# Guardar HTML renderizado
+with open("rendered_template.html", "w") as file:
+    file.write(rendered_html)
 
-    temp = f"{data['main']['temp']:.1f}°C"
-    humidity = f"{data['main']['humidity']}%"
-    condition = data['weather'][0]['description'].capitalize()
-    temp_value = float(temp[:-2])
-
-    # Generar recomendación de bebida
-    if temp_value > 25:
-        beverage_recommendation = "Beat the heat with our refreshing iced coffee!"
-    elif temp_value < 15:
-        beverage_recommendation = "Warm up with our delicious hot chocolate!"
-    else:
-        beverage_recommendation = "Perfect weather for any of our signature drinks!"
-
-    # Seleccionar imagen de fondo
-    background_image = select_background_image(temp_value)
-
-    # Convertir imágenes a base64
-    background_image_b64 = image_to_base64(background_image)
-    logo_image_b64 = image_to_base64("logobgc_vectorized.png")
-
-    # Rellenar la plantilla HTML
-    with open("template.html") as file:
-        template = Template(file.read())
-    
-    rendered_html = template.render(
-        date=date.today().strftime("%A, %B %d, %Y"),
-        temp=temp,
-        humidity=humidity,
-        condition=condition,
-        beverage_recommendation=beverage_recommendation,
-        background_image=background_image_b64,
-        logo_image=logo_image_b64
-    )
-
-    # Guardar HTML renderizado
-    with open("rendered_template.html", "w") as file:
-        file.write(rendered_html)
-
-    # Convertir HTML a imagen
-    hti = Html2Image(output_path='.', custom_flags=['--no-sandbox', '--hide-scrollbars', '--force-device-scale-factor=1'])
-    output_file = f"{date.today()}_Mackay_Story.png"
-    hti.screenshot(html_file='rendered_template.html', save_as=output_file, size=(1080, 1080))
-
-    # Guardar recomendación de bebida en archivo
-    with open("beverage_recommendation.txt", "w") as f:
-        f.write(beverage_recommendation)
-
-    return output_file, beverage_recommendation
-
-# ========================
-# EJECUCIÓN PRINCIPAL
-# ========================
-
-if __name__ == "__main__":
-    output_file, beverage_recommendation = generate_weather_image()
-    if output_file:
-        print(f"Generated image: {output_file}")
-        print(f"Beverage recommendation: {beverage_recommendation}")
-    else:
-        print("Cafe is closed today. No image generated.")
+# Convertir HTML a imagen usando html2image
+hti = Html2Image(output_path='.', custom_flags=['--no-sandbox', '--hide-scrollbars', '--force-device-scale-factor=1'])
+hti = Html2Image(output_path='.')
+hti.screenshot(html_file='rendered_template.html', save_as=f"{tomorrow}_Mackay_Story.png", size=(1080, 1080))
