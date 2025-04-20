@@ -60,7 +60,7 @@ def image_to_base64(image_path):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode('utf-8')
 
-background_image = image_to_base64("Mackay-Large.jpg")
+background_image = image_to_base64("background_images/hotchocolate.jpg")
 logo_image = image_to_base64("logobgc_vectorized.png")
 
 # Rellenar la plantilla HTML
