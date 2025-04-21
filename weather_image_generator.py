@@ -1,73 +1,100 @@
 import os
-from datetime import datetime
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from PIL import Image, ImageDraw, ImageFont
+import base64
+import requests
+import json
+from datetime import datetime, date, timedelta
+from jinja2 import Template
+from html2image import Html2Image
 
-# --- CONFIGURACIÓN ---
-BACKGROUND_IMAGE = "background_images/Hotchocolate.jpg"
-DEFAULT_BACKGROUND = "background_images/default.jpg"
-OUTPUT_IMAGE_NAME = f"{datetime.now().strftime('%Y-%m-%d')}_Mackay_Story.png"
+# === CONFIGURACIÓN ===
+LAT, LON = -21.1582019, 149.159265
+API_KEY = os.getenv("OPENWEATHER_API_KEY")
+if not API_KEY:
+    raise RuntimeError("❌ OPENWEATHER_API_KEY no está definida.")
 
-# --- FUNCIÓN PARA CARGAR IMAGEN DE FONDO ---
-def load_background():
-    if os.path.exists(BACKGROUND_IMAGE):
-        return Image.open(BACKGROUND_IMAGE)
-    elif os.path.exists(DEFAULT_BACKGROUND):
-        print(f"⚠️ Imagen '{BACKGROUND_IMAGE}' no encontrada. Usando fondo por defecto.")
-        return Image.open(DEFAULT_BACKGROUND)
-    else:
-        raise FileNotFoundError("❌ No hay ninguna imagen de fondo disponible.")
+TEMPLATE_PATH   = "template.html"
+LOGO_PATH       = "logobgc_vectorized.png"
+ASSETS_DIR      = "background_images"
+BG_FILENAME     = "Hotchocolate.jpg"
+DEFAULT_BG      = "default.jpg"
+OUTPUT_NAME     = f"{date.today().strftime('%Y-%m-%d')}_Mackay_Story.png"
 
-# --- GENERACIÓN DE LA IMAGEN ---
-def generate_image():
-    # Cargar imagen de fondo
-    background = load_background().convert("RGBA")
-
-    # Crear capa para texto
-    txt_layer = Image.new("RGBA", background.size, (255,255,255,0))
-    draw = ImageDraw.Draw(txt_layer)
-
-    # Fuente (puedes cambiar la ruta si es necesario)
-    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-    font = ImageFont.truetype(font_path, 60)
-
-    # Texto de ejemplo
-    text = "🌞 Mackay Weather Today"
-    w, h = draw.textsize(text, font=font)
-    position = ((background.width - w) // 2, 100)
-    
-    # Contorno blanco
-    outline_range = 2
-    for x in range(-outline_range, outline_range + 1):
-        for y in range(-outline_range, outline_range + 1):
-            draw.text((position[0] + x, position[1] + y), text, font=font, fill="white")
-
-    # Texto negro encima
-    draw.text(position, text, font=font, fill="black")
-
-    # Combinar capas
-    final_image = Image.alpha_composite(background, txt_layer)
-    final_image.convert("RGB").save(OUTPUT_IMAGE_NAME)
-    print(f"✅ Imagen generada: {OUTPUT_IMAGE_NAME}")
-
-# --- SI USA HTML Y SELENIUM (opcional) ---
-def render_with_selenium():
-    chrome_options = Options()
-    chrome_options.add_argument("--headless=new")  # Modo headless moderno
-    chrome_options.add_argument("--window-size=1080,1920")
-
-    driver = webdriver.Chrome(options=chrome_options)
-    driver.get("file://" + os.path.abspath("weather_template.html"))
-
-    screenshot_path = OUTPUT_IMAGE_NAME
-    driver.save_screenshot(screenshot_path)
-    driver.quit()
-    print(f"✅ Captura guardada: {screenshot_path}")
-
-# --- EJECUTAR ---
-if __name__ == "__main__":
+# === FUNCIONES AUXILIARES ===
+def image_to_base64(path):
     try:
-        generate_image()  # O usa render_with_selenium() si tu generación es vía HTML
-    except Exception as e:
-        print(f"❌ Error: {e}")
+        with open(path, "rb") as f:
+            return base64.b64encode(f.read()).decode("utf-8")
+    except FileNotFoundError:
+        print(f"⚠️ Imagen no encontrada: {path}")
+        return ""
+
+def fetch_forecast():
+    tomorrow = date.today() + timedelta(days=1)
+    url = (
+        "https://api.openweathermap.org/data/2.5/forecast"
+        f"?lat={LAT}&lon={LON}"
+        "&units=metric&lang=en"
+        f"&appid={API_KEY}"
+    )
+    r = requests.get(url)
+    r.raise_for_status()
+    data = r.json()
+
+    # Extraer pronósticos para 9am y 12pm
+    def closest(hour):
+        target = datetime.combine(tomorrow, datetime.min.time()) + timedelta(hours=hour)
+        return min(
+            (item for item in data["list"]
+             if datetime.fromtimestamp(item["dt"]).date() == tomorrow),
+            key=lambda x: abs(datetime.fromtimestamp(x["dt"]) - target),
+            default=None
+        )
+
+    out = []
+    for h in (9, 12):
+        f = closest(h)
+        if f:
+            out.append({
+                "time": datetime.fromtimestamp(f["dt"]).strftime("%I:%M %p").lstrip("0").lower(),
+                "temp": f"{f['main']['temp']:.1f}°C",
+                "humidity": f"{f['main']['humidity']}%"
+            })
+        else:
+            out.append({"time": f"{h}:00", "temp": "N/A", "humidity": "N/A"})
+    return tomorrow.strftime("%A, %B %d, %Y"), out
+
+# === PROCESO PRINCIPAL ===
+date_str, forecasts = fetch_forecast()
+
+# Leer plantilla
+with open(TEMPLATE_PATH, "r", encoding="utf-8") as f:
+    tpl = Template(f.read())
+
+html = tpl.render(
+    date=date_str,
+    forecasts=forecasts,
+    background_image=image_to_base64(os.path.join(ASSETS_DIR, BG_FILENAME)),
+    logo_image=image_to_base64(LOGO_PATH)
+)
+
+# Guardar HTML temporal
+with open("rendered_template.html", "w", encoding="utf-8") as f:
+    f.write(html)
+
+# Generar imagen con html2image (usa Chrome headless)
+hti = Html2Image(
+    output_path=".",
+    custom_flags=[
+        "--headless=new",
+        "--no-sandbox",
+        "--hide-scrollbars",
+        "--force-device-scale-factor=1"
+    ]
+)
+hti.screenshot(
+    html_file="rendered_template.html",
+    save_as=OUTPUT_NAME,
+    size=(1080, 1080)
+)
+
+print(f"✅ Imagen generada: {OUTPUT_NAME}")
