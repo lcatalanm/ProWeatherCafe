@@ -101,23 +101,17 @@ try:
             "--disable-gpu",
             "--disable-dev-shm-usage",
             "--disable-software-rasterizer",
-            "--disable-extensions",
             "--hide-scrollbars",
-            "--disable-setuid-sandbox",
             "--force-device-scale-factor=1"
         ]
     )
     
-    # Redirect stderr to suppress Chrome warnings
-    old_stderr = sys.stderr
-    with open(os.devnull, 'w') as devnull:
-        sys.stderr = devnull
-        hti.screenshot(
-            html_file="rendered_template.html",
-            save_as=OUTPUT_NAME,
-            size=(1080, 1080)
-        )
-        sys.stderr = old_stderr
+    # Generate the image
+    hti.screenshot(
+        html_file="rendered_template.html",
+        save_as=OUTPUT_NAME,
+        size=(1080, 1080)
+    )
 
     # Verify image was created
     if os.path.exists(OUTPUT_NAME):

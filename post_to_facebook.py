@@ -3,7 +3,6 @@ import requests
 import json
 import sys
 from datetime import datetime
-from pathlib import Path
 
 # Constants
 ACCESS_TOKEN = os.getenv("FB_ACCESS_TOKEN")
@@ -45,12 +44,10 @@ def main():
     if not ACCESS_TOKEN or not PAGE_ID:
         raise RuntimeError("❌ Missing FB_ACCESS_TOKEN or FACEBOOK_PAGE_ID")
     
-    image_path = Path(IMAGE_PATH)
-    if not image_path.exists():
+    if not os.path.exists(IMAGE_PATH):
         raise FileNotFoundError(f"❌ Image not found: {IMAGE_PATH}")
     
-    caption_path = Path(CAPTION_PATH)
-    if not caption_path.exists():
+    if not os.path.exists(CAPTION_PATH):
         raise FileNotFoundError(f"❌ Caption file not found: {CAPTION_PATH}")
     
     # Validate token first
@@ -65,10 +62,10 @@ def main():
     url = f"https://graph.facebook.com/{API_VERSION}/{PAGE_ID}/photos"
     
     # Verify image size and existence
-    file_size = image_path.stat().st_size
+    file_size = os.path.getsize(IMAGE_PATH)
     print(f"Image size: {file_size} bytes")
     
-    with open(image_path, "rb") as img:
+    with open(IMAGE_PATH, "rb") as img:
         files = {"source": img}
         data = {"access_token": ACCESS_TOKEN, "caption": caption}
         
