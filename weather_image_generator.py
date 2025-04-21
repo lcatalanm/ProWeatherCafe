@@ -1,84 +1,74 @@
+import os
 import requests
-import json
-import base64
-from datetime import date, datetime, timedelta
-from jinja2 import Template
+from datetime import datetime, date, timedelta
+from jinja2 import Environment, FileSystemLoader
 from html2image import Html2Image
+import base64
 
-# Configuración
-api_key = "26b68d1690cad1a73037ef81ced8529b"  # Actualiza con tu API key
-horarios = ["09:00:00", "10:00:00", "11:00:00", "12:00:00", "13:00:00", "14:00:00"]
-city = "Mackay"
+# === CONFIGURACIÓN ===
+LAT, LON = -21.1582019, 149.159265
+UNITS = "metric"
+LANG = "en"
+API_KEY = os.getenv("OPENWEATHER_API_KEY")
+TEMPLATE = "template.html"
+OUTPUT_IMAGE = "output_forecast.png"
+ASSETS_DIR = "background_images"
+LOGO_PATH = "logobgc_vectorized.png"
+BACKGROUND_PATH = os.path.join(ASSETS_DIR, "hotchocolate.jpg")
 
-# Obtener datos del clima
-url = f"http://api.openweathermap.org/data/2.5/forecast?q={city}&appid={api_key}&units=metric"
-response = requests.get(url)
-data = json.loads(response.text)
+# === VALIDACIÓN DE VARIABLES DE ENTORNO ===
+if not API_KEY:
+    raise RuntimeError("❌ OPENWEATHER_API_KEY no está definida.")
 
-# Procesar datos del clima
-forecasts = []
-tomorrow = date.today()
-for horario in horarios:
-    forecast_time = datetime.combine(tomorrow, datetime.strptime(horario, "%H:%M:%S").time())
-    forecast_found = False
-    for forecast in data['list']:
-        api_time = datetime.strptime(forecast['dt_txt'], "%Y-%m-%d %H:%M:%S")
-        if api_time.date() == tomorrow and abs(api_time - forecast_time) <= timedelta(hours=1):
-            forecast_found = True
-            forecasts.append({
-                'time': forecast_time.strftime("%I:%M %p").lower().lstrip('0'),
-                'temp': f"{forecast['main']['temp']:.1f}°C",
-                'humidity': f"{forecast['main']['humidity']}%"
-            })
-            print(f"Encontrado pronóstico para {horario}: {forecast['dt_txt']}")
-            break
-    if not forecast_found:
-        nearest_forecast = min(data['list'], key=lambda x: abs(datetime.strptime(x['dt_txt'], "%Y-%m-%d %H:%M:%S") - forecast_time))
-        nearest_time = datetime.strptime(nearest_forecast['dt_txt'], "%Y-%m-%d %H:%M:%S")
-        if nearest_time.date() == tomorrow:
-            forecasts.append({
-                'time': forecast_time.strftime("%I:%M %p").lower().lstrip('0'),
-                'temp': f"{nearest_forecast['main']['temp']:.1f}°C",
-                'humidity': f"{nearest_forecast['main']['humidity']}%"
-            })
-            print(f"Usando pronóstico más cercano para {horario}: {nearest_forecast['dt_txt']}")
-        else:
-            forecasts.append({
-                'time': forecast_time.strftime("%I:%M %p").lower().lstrip('0'),
-                'temp': 'N/A',
-                'humidity': 'N/A'
-            })
-            print(f"No se encontró pronóstico para {horario}")
+# === FUNCIONES ===
+def image_to_base64(path):
+    try:
+        with open(path, "rb") as f:
+            return base64.b64encode(f.read()).decode("utf-8")
+    except FileNotFoundError:
+        print(f"⚠️ Imagen no encontrada: {path}")
+        return ""
 
-# Imprimir pronósticos procesados
-print("\nPronósticos procesados:")
-for forecast in forecasts:
-    print(forecast)
+def get_weather_forecast():
+    url = (
+        f"https://api.openweathermap.org/data/2.5/forecast?"
+        f"lat={LAT}&lon={LON}&units={UNITS}&lang={LANG}&appid={API_KEY}"
+    )
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        raise RuntimeError(f"❌ Error al obtener pronóstico: {e}")
 
-# Convertir imágenes a base64
-def image_to_base64(image_path):
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode('utf-8')
+def get_forecast_for_hour(data, target_hour):
+    tomorrow = date.today() + timedelta(days=1)
+    forecasts = [item for item in data["list"]
+                 if datetime.fromtimestamp(item["dt"]).date() == tomorrow]
 
-background_image = image_to_base64("background_images/hotchocolate.jpg")
-logo_image = image_to_base64("logobgc_vectorized.png")
+    def closest(item):
+        forecast_time = datetime.fromtimestamp(item["dt"]).time()
+        return abs(datetime.combine(tomorrow, forecast_time).hour - target_hour)
 
-# Rellenar la plantilla HTML
-with open("template.html") as file:
-    template = Template(file.read())
+    return min(forecasts, key=closest)
+
+# === PROCESO PRINCIPAL ===
+weather_data = get_weather_forecast()
+forecast_9am = get_forecast_for_hour(weather_data, 9)
+forecast_12pm = get_forecast_for_hour(weather_data, 12)
+
+env = Environment(loader=FileSystemLoader("."))
+template = env.get_template(TEMPLATE)
 
 rendered_html = template.render(
-    date=(tomorrow).strftime("%A, %B %d, %Y"),
-    forecasts=forecasts,
-    background_image=background_image,
-    logo_image=logo_image
+    forecast_9am=forecast_9am,
+    forecast_12pm=forecast_12pm,
+    logo_base64=image_to_base64(LOGO_PATH),
+    background_base64=image_to_base64(BACKGROUND_PATH),
+    today=date.today().strftime("%A, %d %B %Y")
 )
 
-# Guardar HTML renderizado
-with open("rendered_template.html", "w") as file:
-    file.write(rendered_html)
+hti = Html2Image(output_path='.', custom_flags=['--virtual-time-budget=3000'])
+hti.screenshot(html_str=rendered_html, save_as=OUTPUT_IMAGE)
 
-# Convertir HTML a imagen usando html2image
-hti = Html2Image(output_path='.', custom_flags=['--no-sandbox', '--hide-scrollbars', '--force-device-scale-factor=1'])
-hti = Html2Image(output_path='.')
-hti.screenshot(html_file='rendered_template.html', save_as=f"{tomorrow}_Mackay_Story.png", size=(1080, 1080))
+print(f"✅ Imagen generada: {OUTPUT_IMAGE}")
