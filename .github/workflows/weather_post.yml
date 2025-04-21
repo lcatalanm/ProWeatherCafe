@@ -1,8 +1,11 @@
 name: Generate and Post Weather Image
 
 on:
+  push:
   schedule:
-    - cron: '40 8 * * *'  # 8:40 AM AEST (22:40 UTC)
+    - cron: '40 8 * * *'
+  workflow_dispatch:   # 🔥 Habilita ejecutar manualmente desde GitHub
+
 
 jobs:
   generate-and-post:
