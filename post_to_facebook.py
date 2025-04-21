@@ -1,61 +1,37 @@
 import os
 import requests
-from datetime import date
-import random
 
-def get_creative_text(beverage_recommendation):
-    texts = [
-        "☀️ Rise and shine, Mackay! Here's your daily dose of weather and coffee inspiration. ☕",
-        "🌤 Weather forecast with a side of caffeine! Check out what's brewing at Mackay Botanic Gardens today.",
-        "🌿 Nature, weather, and coffee - the perfect trio! See what's in store for you today at our garden café.",
-        "🌺 Blooming beautiful day ahead! Discover the perfect weather for a garden stroll and a cuppa.",
-        "🍃 From gentle breezes to steaming brews, here's your daily Mackay Botanic Gardens update!",
-        "🌸 Perk up your day with our weather report and beverage recommendation!",
-        "🌴 Tropical vibes and coffee jives! Your daily Mackay weather and café update is here.",
-        "🌻 Sunshine or showers? Either way, we've got the perfect drink waiting for you!",
-        "🍵 Steep yourself in today's weather and our tailored drink recommendation.",
-        "🌈 Whatever the weather, we've got you covered! Check out today's forecast and café special."
-    ]
-    chosen_text = random.choice(texts)
-    return f"{chosen_text}\n\n{beverage_recommendation}"
+ACCESS_TOKEN = os.getenv("FB_ACCESS_TOKEN")
+PAGE_ID = os.getenv("FACEBOOK_PAGE_ID")
+IMAGE_PATH = "output_forecast.png"
+CAPTION_PATH = "beverage_recommendation.txt"
+GRAPH_API_VERSION = "v17.0"
 
-def post_to_facebook(image_path, beverage_recommendation):
-    access_token = os.environ.get("FB_ACCESS_TOKEN")
-    page_id = os.environ.get("FACEBOOK_PAGE_ID")  # Usando el nuevo secreto
+# === VALIDACIONES ===
+if not ACCESS_TOKEN or not PAGE_ID:
+    raise RuntimeError("❌ Deben estar definidas FB_ACCESS_TOKEN y FACEBOOK_PAGE_ID")
 
-    url = f"https://graph.facebook.com/{page_id}/photos"
+if not os.path.exists(IMAGE_PATH):
+    raise FileNotFoundError(f"❌ No se encontró la imagen: {IMAGE_PATH}")
 
-    message = get_creative_text(beverage_recommendation)
+if not os.path.exists(CAPTION_PATH):
+    raise FileNotFoundError(f"❌ No se encontró el archivo de caption: {CAPTION_PATH}")
 
-    with open(image_path, "rb") as image_file:
-        params = {
-            "access_token": access_token,
-            "message": message
-        }
-        files = {
-            "source": image_file
-        }
-        response = requests.post(url, params=params, files=files)
+# === CARGAR TEXTO ===
+with open(CAPTION_PATH, "r", encoding="utf-8") as f:
+    caption = f.read()
 
-    if response.status_code == 200:
-        print("Image posted successfully!")
-    else:
-        print(f"Failed to post image. Status code: {response.status_code}")
-        print(f"Response: {response.text}")
-
-if __name__ == "__main__":
-    today = date.today().strftime("%Y-%m-%d")
-    image_path = f"{today}_Mackay_Story.png"
-    
-    if os.path.exists(image_path):
-        try:
-            with open("beverage_recommendation.txt", "r") as f:
-                beverage_recommendation = f.read().strip()
-        except FileNotFoundError:
-            beverage_recommendation = "Enjoy our special beverage of the day!"
-            with open("beverage_recommendation.txt", "w") as f:
-                f.write(beverage_recommendation)
-                
-        post_to_facebook(image_path, beverage_recommendation)
-    else:
-        print("No image generated for today. Skipping Facebook post.")
+# === HACER POST ===
+url = f"https://graph.facebook.com/{GRAPH_API_VERSION}/{PAGE_ID}/photos"
+with open(IMAGE_PATH, "rb") as img:
+    files = {"source": img}
+    data = {
+        "access_token": ACCESS_TOKEN,
+        "caption": caption
+    }
+    try:
+        response = requests.post(url, files=files, data=data)
+        response.raise_for_status()
+        print("✅ Publicación realizada correctamente.")
+    except requests.RequestException as e:
+        raise RuntimeError(f"❌ Error al publicar en Facebook: {e}")
