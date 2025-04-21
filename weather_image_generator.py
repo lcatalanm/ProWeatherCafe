@@ -61,12 +61,23 @@ env = Environment(loader=FileSystemLoader("."))
 template = env.get_template(TEMPLATE)
 
 rendered_html = template.render(
-    forecast_9am=forecast_9am,
-    forecast_12pm=forecast_12pm,
-    logo_base64=image_to_base64(LOGO_PATH),
-    background_base64=image_to_base64(BACKGROUND_PATH),
-    today=date.today().strftime("%A, %d %B %Y")
+    forecasts=[
+        {
+            "time": datetime.fromtimestamp(forecast_9am["dt"]).strftime("%I:%M %p"),
+            "temp": f"{forecast_9am['main']['temp']}°C",
+            "humidity": f"{forecast_9am['main']['humidity']}%"
+        },
+        {
+            "time": datetime.fromtimestamp(forecast_12pm["dt"]).strftime("%I:%M %p"),
+            "temp": f"{forecast_12pm['main']['temp']}°C",
+            "humidity": f"{forecast_12pm['main']['humidity']}%"
+        }
+    ],
+    date=date.today().strftime("%A, %d %B %Y"),
+    logo_image=image_to_base64(LOGO_PATH),
+    background_image=image_to_base64(BACKGROUND_PATH)
 )
+
 
 hti = Html2Image(output_path='.', custom_flags=['--virtual-time-budget=3000'])
 hti.screenshot(html_str=rendered_html, save_as=OUTPUT_IMAGE)

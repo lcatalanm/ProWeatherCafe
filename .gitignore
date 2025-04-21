@@ -1,0 +1,5 @@
+output_forecast.png
+__pycache__/
+.env
+*.pyc
+used_images.json
