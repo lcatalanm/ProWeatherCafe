@@ -1,85 +1,73 @@
 import os
-import requests
-from datetime import datetime, date, timedelta
-from jinja2 import Environment, FileSystemLoader
-from html2image import Html2Image
-import base64
+from datetime import datetime
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from PIL import Image, ImageDraw, ImageFont
 
-# === CONFIGURACIÓN ===
-LAT, LON = -21.1582019, 149.159265
-UNITS = "metric"
-LANG = "en"
-API_KEY = os.getenv("OPENWEATHER_API_KEY")
-TEMPLATE = "template.html"
-OUTPUT_IMAGE = "output_forecast.png"
-ASSETS_DIR = "background_images"
-LOGO_PATH = "logobgc_vectorized.png"
-BACKGROUND_PATH = os.path.join(ASSETS_DIR, "hotchocolate.jpg")
+# --- CONFIGURACIÓN ---
+BACKGROUND_IMAGE = "background_images/Hotchocolate.jpg"
+DEFAULT_BACKGROUND = "background_images/default.jpg"
+OUTPUT_IMAGE_NAME = f"{datetime.now().strftime('%Y-%m-%d')}_Mackay_Story.png"
 
-# === VALIDACIÓN DE VARIABLES DE ENTORNO ===
-if not API_KEY:
-    raise RuntimeError("❌ OPENWEATHER_API_KEY no está definida.")
+# --- FUNCIÓN PARA CARGAR IMAGEN DE FONDO ---
+def load_background():
+    if os.path.exists(BACKGROUND_IMAGE):
+        return Image.open(BACKGROUND_IMAGE)
+    elif os.path.exists(DEFAULT_BACKGROUND):
+        print(f"⚠️ Imagen '{BACKGROUND_IMAGE}' no encontrada. Usando fondo por defecto.")
+        return Image.open(DEFAULT_BACKGROUND)
+    else:
+        raise FileNotFoundError("❌ No hay ninguna imagen de fondo disponible.")
 
-# === FUNCIONES ===
-def image_to_base64(path):
+# --- GENERACIÓN DE LA IMAGEN ---
+def generate_image():
+    # Cargar imagen de fondo
+    background = load_background().convert("RGBA")
+
+    # Crear capa para texto
+    txt_layer = Image.new("RGBA", background.size, (255,255,255,0))
+    draw = ImageDraw.Draw(txt_layer)
+
+    # Fuente (puedes cambiar la ruta si es necesario)
+    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+    font = ImageFont.truetype(font_path, 60)
+
+    # Texto de ejemplo
+    text = "🌞 Mackay Weather Today"
+    w, h = draw.textsize(text, font=font)
+    position = ((background.width - w) // 2, 100)
+    
+    # Contorno blanco
+    outline_range = 2
+    for x in range(-outline_range, outline_range + 1):
+        for y in range(-outline_range, outline_range + 1):
+            draw.text((position[0] + x, position[1] + y), text, font=font, fill="white")
+
+    # Texto negro encima
+    draw.text(position, text, font=font, fill="black")
+
+    # Combinar capas
+    final_image = Image.alpha_composite(background, txt_layer)
+    final_image.convert("RGB").save(OUTPUT_IMAGE_NAME)
+    print(f"✅ Imagen generada: {OUTPUT_IMAGE_NAME}")
+
+# --- SI USA HTML Y SELENIUM (opcional) ---
+def render_with_selenium():
+    chrome_options = Options()
+    chrome_options.add_argument("--headless=new")  # Modo headless moderno
+    chrome_options.add_argument("--window-size=1080,1920")
+
+    driver = webdriver.Chrome(options=chrome_options)
+    driver.get("file://" + os.path.abspath("weather_template.html"))
+
+    screenshot_path = OUTPUT_IMAGE_NAME
+    driver.save_screenshot(screenshot_path)
+    driver.quit()
+    print(f"✅ Captura guardada: {screenshot_path}")
+
+# --- EJECUTAR ---
+if __name__ == "__main__":
     try:
-        with open(path, "rb") as f:
-            return base64.b64encode(f.read()).decode("utf-8")
-    except FileNotFoundError:
-        print(f"⚠️ Imagen no encontrada: {path}")
-        return ""
-
-def get_weather_forecast():
-    url = (
-        f"https://api.openweathermap.org/data/2.5/forecast?"
-        f"lat={LAT}&lon={LON}&units={UNITS}&lang={LANG}&appid={API_KEY}"
-    )
-    try:
-        response = requests.get(url)
-        response.raise_for_status()
-        return response.json()
-    except requests.RequestException as e:
-        raise RuntimeError(f"❌ Error al obtener pronóstico: {e}")
-
-def get_forecast_for_hour(data, target_hour):
-    tomorrow = date.today() + timedelta(days=1)
-    forecasts = [item for item in data["list"]
-                 if datetime.fromtimestamp(item["dt"]).date() == tomorrow]
-
-    def closest(item):
-        forecast_time = datetime.fromtimestamp(item["dt"]).time()
-        return abs(datetime.combine(tomorrow, forecast_time).hour - target_hour)
-
-    return min(forecasts, key=closest)
-
-# === PROCESO PRINCIPAL ===
-weather_data = get_weather_forecast()
-forecast_9am = get_forecast_for_hour(weather_data, 9)
-forecast_12pm = get_forecast_for_hour(weather_data, 12)
-
-env = Environment(loader=FileSystemLoader("."))
-template = env.get_template(TEMPLATE)
-
-rendered_html = template.render(
-    forecasts=[
-        {
-            "time": datetime.fromtimestamp(forecast_9am["dt"]).strftime("%I:%M %p"),
-            "temp": f"{forecast_9am['main']['temp']}°C",
-            "humidity": f"{forecast_9am['main']['humidity']}%"
-        },
-        {
-            "time": datetime.fromtimestamp(forecast_12pm["dt"]).strftime("%I:%M %p"),
-            "temp": f"{forecast_12pm['main']['temp']}°C",
-            "humidity": f"{forecast_12pm['main']['humidity']}%"
-        }
-    ],
-    date=date.today().strftime("%A, %d %B %Y"),
-    logo_image=image_to_base64(LOGO_PATH),
-    background_image=image_to_base64(BACKGROUND_PATH)
-)
-
-
-hti = Html2Image(output_path='.', custom_flags=['--virtual-time-budget=3000'])
-hti.screenshot(html_str=rendered_html, save_as=OUTPUT_IMAGE)
-
-print(f"✅ Imagen generada: {OUTPUT_IMAGE}")
+        generate_image()  # O usa render_with_selenium() si tu generación es vía HTML
+    except Exception as e:
+        print(f"❌ Error: {e}")

@@ -1,9 +1,11 @@
 import os
 import requests
+from datetime import datetime
+
 
 ACCESS_TOKEN = os.getenv("FB_ACCESS_TOKEN")
 PAGE_ID = os.getenv("FACEBOOK_PAGE_ID")
-IMAGE_PATH = "output_forecast.png"
+IMAGE_PATH = f"{datetime.now().strftime('%Y-%m-%d')}_Mackay_Story.png"
 CAPTION_PATH = "beverage_recommendation.txt"
 GRAPH_API_VERSION = "v17.0"
 
