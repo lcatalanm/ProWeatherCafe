@@ -21,10 +21,10 @@ jobs:
 
     - name: Install Chrome
       run: |
+        wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+        sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
         sudo apt-get update
-        sudo apt-get install -y wget unzip xvfb
-        wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-        sudo apt install -y ./google-chrome-stable_current_amd64.deb
+        sudo apt-get install -y google-chrome-stable xvfb
 
     - name: Install dependencies
       run: |
@@ -36,13 +36,27 @@ jobs:
         OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
       run: |
         python weather_image_generator.py
+        
+        # Check if image was generated
         IMAGE_NAME="$(date +%Y-%m-%d)_Mackay_Story.png"
         if [ -f "$IMAGE_NAME" ]; then
           echo "✅ Generated image: $IMAGE_NAME"
+          echo "Image size: $(stat -c%s "$IMAGE_NAME") bytes"
+          
+          # Create a directory for artifacts
+          mkdir -p image_artifacts
+          cp "$IMAGE_NAME" image_artifacts/
         else
           echo "⚠️ No image generated. Exiting."
-          exit 0
+          exit 1
         fi
+
+    - name: Upload image as artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: weather-image
+        path: image_artifacts/
+        retention-days: 5
 
     - name: Post to Facebook
       env:
